@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+<link rel="stylesheet" href="http://yui.yahooapis.com/pure/0.6.0/pure-min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-contextmenu/2.0.1/jquery.contextMenu.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+<link rel="stylesheet" href="//code.jquery.com/ui/1.12.0/themes/base/jquery-ui.css">
+<link rel="stylesheet" href="inc/c3.min.css">
+<link rel="stylesheet" href="inc/demo.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/3.10.1/lodash.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.14.1/moment.min.js"></script>
+<script src="inc/d3.min.js"></script>
+<!--<script src="//d3js.org/d3.v4.min.js"></script>-->
+<script src="inc/c3.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-contextmenu/2.0.1/jquery.contextMenu.min.js"></script>
+<script src="https://code.jquery.com/ui/1.12.0/jquery-ui.js"></script>
+</head>
+<body>
+<script src="inc/sankey.js"></script>
+<script src="inc/analysis_tree.js"></script>
+<script src="inc/transcript.js"></script>
+<script src="inc/visualizations.js"></script>
+<script src="inc/table.js"></script>
+<script src="inc/grid.js"></script>
+<div id="modal_outer" class="background">
+  <div id="modal"></div>
+</div>
+<div class="pure-g masthead">
+  <div class="pure-u-2-12 sidebar" id="masthead">
+    <img id="logo" src="inc/logo.png" style="float: left;"></img>
+    <div class="masthead" style="float: left;">
+      galaxy
+      <i class="fa fa-share-alt fa-fw" style="margin-left: 15px; font-size: 40px" id="main_nav_button"></i>
+      <i class="fa fa-binoculars fa-fw" style="font-size: 40px;" id="scope_nav_button"></i>
+      <i class="fa fa-inbox fa-fw badge" data-count="0" style="font-size: 40px;" id="queue_nav_button"></i>
+    </div>
+  </div>
+  <div class="pure-u-8-12 sidebar" id="search_container"> 
+    <form id="search_form" style="display:inline-block">
+      <input name="query" size="55"></input>
+      <span class="overwatch">start</span>
+      <input type="text" id="start_date" size="15"></input>       
+      <span class="overwatch">end</span>
+      <input type="text" id="end_date" size="15"></input>
+      <button id="query_submit">Search</button>
+    </form>
+  </div> 
+  <div class="pure-u-2-12">
+    <span id="notification_container" style="padding-left: 30px; position: absolute; top: 5px;"></span>
+    <span id="error_container" style="padding-left: 30px; position: absolute; top: 5px;"></span>
+  </div>
+</div>
+<div class="pure-g sidebar" id="pulldown"></div>
+<div class="pure-g main-content" id="main_content">
+  <div class="pure-u-1-4" id="sidebar_container">
+    <div class="pure-g">
+      <div class="pure-u-1 sidebar" id="sidebar">
+        <div class="pure-g" id="scopes_and_tags">
+          <div id="scope_container" class="pure-u-1" ></div>
+          <div id="action_container" class="pure-u-1" ></div>
+          <!--<h1 class="overwatch">tags</h1>-->
+          <div id="tags" class="pure-u-1 tags"></div>
+          <!--<h1 class="overwatch">favorites</h1>-->
+          <div id="favorites" class="pure-u-1 tags"></div>
+        </div>
+      </div>
+      <div class="pure-u-1" id="transcript_container"></div>
+    </div>
+  </div>
+  <div class="pure-u-3-4" id="content_container">
+    <div class="pure-g">
+      <div class="pure-u-1" id="histogram_container"></div>
+      <div class="pure-u-1" id="viz_container"></div>
+    </div>
+  </div>
+  <div class="pure-u-1" id="grid_container"></div>
+</div>
+</body>
+</html>
