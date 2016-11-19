@@ -120,7 +120,7 @@ class SearchHandler(BaseHandler):
 		self.db = kwargs["db"]
 		del kwargs["db"]
 		super(SearchHandler, self).__init__(application, request, **kwargs)
-		self.log = logging.getLogger("elsa.search_handler")
+		self.log = logging.getLogger("galaxy.search_handler")
 		self.parser = Parser()
 		self.ip_fields = frozenset(["srcip", "dstip", "ip"])
 		
@@ -162,6 +162,7 @@ class SearchHandler(BaseHandler):
 		self.log.debug("parsed: %r" % self.request.parsed)
 		if body.has_key("hits"):
 			for hit in body["hits"]["hits"]:
+				hit["_source"]["orig_@timestamp"] = hit["_source"]["@timestamp"]
 				hit["_source"]["@timestamp"] = datetime.datetime.fromtimestamp(int(hit["_source"]["@timestamp"])/1000).isoformat()
 		if body.has_key("aggregations"):
 			for rawfield, buckethash in body["aggregations"].iteritems():
@@ -190,6 +191,7 @@ class SearchHandler(BaseHandler):
 		desc = self.request.es_query["query"]["bool"]["must"][0]["query"]["query_string"]["query"]
 		if self.request.parsed.has_key("groupby"):
 			desc += " (" + ",".join(self.request.parsed["groupby"][1:]) + ")"
+		desc = "[%d] " % body.get("hits", {}).get("total", 0) + desc
 
 		body = {
 			"results": body,
@@ -209,6 +211,9 @@ class SearchHandler(BaseHandler):
 		}
 
 		scope_id = self.get_argument("scope_id", None)
+		if scope_id:
+			scope_id = int(scope_id)
+			body["scope_id"] = scope_id
 		ref_id = self.get_argument("ref_id", None)
 		if ref_id:
 			body["ref_id"] = data["ref_id"] = int(ref_id)
@@ -300,7 +305,7 @@ class BaseWebHandler(tornado.web.RequestHandler):
 
 	def initialize(self, *args, **kwargs):
 		super(BaseWebHandler, self).initialize()
-		self.log = logging.getLogger("elsa.web.handler")
+		self.log = logging.getLogger("galaxy.web.handler")
 
 class IndexHandler(BaseWebHandler):
 	def initialize(self, filename, mimetype="text/html"):
@@ -339,7 +344,7 @@ class StaticHandler(BaseWebHandler):
 class TranscriptHandler(BaseWebHandler):
 	def __init__(self, application, request, **kwargs):
 		super(TranscriptHandler, self).__init__(application, request, **kwargs)
-		self.log = logging.getLogger("elsa.transcript_handler")
+		self.log = logging.getLogger("galaxy.transcript_handler")
 		self.db = kwargs["db"]
 
 
@@ -348,17 +353,30 @@ class TranscriptHandler(BaseWebHandler):
 
 	def get(self):
 		user = DEFAULT_USER
+		req_id = self.get_argument("id", None)
+		if req_id:
+			needed_row = self.db.execute(
+				"SELECT a.*, b.description AS referenced_search_description, " +\
+				"c.scope, c.category, c.search AS scope_search " +\
+				"FROM transcript AS a " +\
+				"LEFT JOIN transcript AS b ON a.ref_id=b.id " +\
+				"LEFT JOIN scopes AS c ON a.scope_id=c.id " +\
+				"WHERE a.user_id=(SELECT id FROM users WHERE user=?) AND a.id=?",
+				(user, req_id)).fetchone()
+			self.write(json.dumps(needed_row))
+			return
 		limit = self.get_argument("limit", 50)
 		self.set_status(200)
 		self.set_header("Content-Type", "application/javascript")
-		self.write(json.dumps(self.db.execute(
+		rows = self.db.execute(
 			"SELECT a.*, b.description AS referenced_search_description, " +\
 			"c.scope, c.category, c.search AS scope_search " +\
 			"FROM transcript AS a " +\
 			"LEFT JOIN transcript AS b ON a.ref_id=b.id " +\
 			"LEFT JOIN scopes AS c ON a.scope_id=c.id " +\
 			"WHERE a.user_id=(SELECT id FROM users WHERE user=?) AND a.visible=1 " +\
-			"ORDER BY a.id DESC LIMIT ?", (user, limit)).fetchall()))
+			"ORDER BY a.id DESC LIMIT ?", (user, limit)).fetchall()
+		self.write(json.dumps(rows))
 
 	def put(self):
 		user = DEFAULT_USER
@@ -471,7 +489,7 @@ class TranscriptHandler(BaseWebHandler):
 class SearchResultsHandler(BaseWebHandler):
 	def __init__(self, application, request, **kwargs):
 		super(SearchResultsHandler, self).__init__(application, request, **kwargs)
-		self.log = logging.getLogger("elsa.search_result_handler")
+		self.log = logging.getLogger("galaxy.search_result_handler")
 		self.db = kwargs["db"]
 
 
@@ -508,7 +526,7 @@ class SearchResultsHandler(BaseWebHandler):
 class TagsHandler(BaseWebHandler):
 	def __init__(self, application, request, **kwargs):
 		super(TagsHandler, self).__init__(application, request, **kwargs)
-		self.log = logging.getLogger("elsa.tags_handler")
+		self.log = logging.getLogger("galaxy.tags_handler")
 		self.db = kwargs["db"]
 
 
@@ -537,7 +555,7 @@ class TagsHandler(BaseWebHandler):
 class FavoritesHandler(BaseWebHandler):
 	def __init__(self, application, request, **kwargs):
 		super(FavoritesHandler, self).__init__(application, request, **kwargs)
-		self.log = logging.getLogger("elsa.favorites_handler")
+		self.log = logging.getLogger("galaxy.favorites_handler")
 		self.db = kwargs["db"]
 
 
@@ -565,7 +583,7 @@ class FavoritesHandler(BaseWebHandler):
 class ScopesHandler(BaseWebHandler):
 	def __init__(self, application, request, **kwargs):
 		super(ScopesHandler, self).__init__(application, request, **kwargs)
-		self.log = logging.getLogger("elsa.scopes_handler")
+		self.log = logging.getLogger("galaxy.scopes_handler")
 		self.db = kwargs["db"]
 
 

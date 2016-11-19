@@ -109,7 +109,7 @@ Transcript.prototype.visualize = function(dom_element){
   var force = d3.layout.force()
     //.gravity(0.03)
     .distance(100)
-    .charge(-300)
+    .charge(-350)
     .size([width, height]);
   
   force
@@ -157,9 +157,45 @@ Transcript.prototype.visualize = function(dom_element){
     .text(function(d) { return self.action_icons[d.data.action].unicode });
 
   node.append("text")
+    .attr('class', 'label')
     .attr("dx", 12)
     .attr("dy", ".35em")
     .text(function(d) { return d.data.description });
+
+  // var padding = 1, // separation between circles
+  //   radius=8;
+  // function collide(alpha) {
+  //   console.log('collide');
+  //   var quadtree = d3.geom.quadtree(self.nodes);
+  //   return function(d) {
+  //     var rb = 2*radius + padding,
+  //         nx1 = d.x - rb,
+  //         nx2 = d.x + rb,
+  //         ny1 = d.y - rb,
+  //         ny2 = d.y + rb;
+  //     quadtree.visit(function(quad, x1, y1, x2, y2) {
+  //       if (quad.point && (quad.point !== d)) {
+  //         var x = d.x - quad.point.x,
+  //             y = d.y - quad.point.y,
+  //             l = Math.sqrt(x * x + y * y);
+  //           if (l < rb) {
+  //           l = (l - rb) / l * alpha;
+  //           d.x -= x *= l;
+  //           d.y -= y *= l;
+  //           quad.point.x += x;
+  //           quad.point.y += y;
+  //         }
+  //       }
+  //       return x1 > nx2 || x2 < nx1 || y1 > ny2 || y2 < ny1;
+  //     });
+  //   };
+  // }
+
+  function collide(){
+    node.selectAll('.label').each(function(d){
+      console.log(d.x, d.y);
+    });
+  }
   
   force.on("tick", function(e) {
     // Push different nodes in different directions for clustering.
@@ -172,7 +208,7 @@ Transcript.prototype.visualize = function(dom_element){
       else o.y += k;
     });
 
-  node.attr("cx", function(d) { return d.x; })
+    node.attr("cx", function(d) { return d.x; })
       .attr("cy", function(d) { return d.y; });
 
     link.attr("x1", function(d) { return d.source.x; })
@@ -181,6 +217,44 @@ Transcript.prototype.visualize = function(dom_element){
     .attr("y2", function(d) { return d.target.y; });
 
     node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+    //node.selectAll('.label').each(collide(0.5));
+  });
+
+  force.on('end', function(){ 
+    console.log('end');
+    node.selectAll('.label').each(function(d){
+      var outer = this;
+      console.log(d.x, d.y, this.scrollHeight, this.scrollWidth);
+      var x1 = d.x;
+      var x2 = d.x + this.scrollWidth + 1;
+      var y1 = d.y;
+      var y2 = d.y + this.scrollHeight + 1;
+      node.selectAll('.label').each(function(d){
+        if (this === outer) return;
+        var inner_x1 = d.x;
+        var inner_x2 = d.x + this.scrollWidth + 1;
+        var inner_y1 = d.y;
+        var inner_y2 = d.y + this.scrollHeight + 1;
+        
+        if (inner_x1 >= x1 && inner_x1 <= x2 && inner_y1 >= y1 && inner_y1 <= y2){
+          d.x += 5;
+          d.y += 5;
+        }
+        else if (inner_x1 >= x1 && inner_x1 <= x2 && inner_y2 >= y1 && inner_y2 <= y2){
+          d.x += 5;
+          d.y -= 5;
+        }
+        else if (inner_x2 >= x1 && inner_x2 <= x2 && inner_y1 >= y1 && inner_y1 <= y2){
+          d.x -= 5;
+          d.y += 5;
+        }
+        else if (inner_x2 >= x1 && inner_x2 <= x2 && inner_y2 >= y1 && inner_y2 <= y2){
+          d.x -= 5;
+          d.y -= 5;
+        }
+        node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+      });
+    });
   });
 
 };
@@ -255,7 +329,18 @@ Transcript.prototype.get_id = function(id){
   for (var i = 0, len = self.transcript.length; i < len; i++){
     if (self.transcript[i].id === id) return i;
   }
-  throw Error('Id ' + id + ' not found.');
+  //throw Error('Id ' + id + ' not found.');
+  // Go and get it
+  var response = $.ajax({
+    type: 'GET',
+    async: false,
+    url: 'transcript?id=' + id
+  });
+  console.log('had to go and get ', response);
+  var row = JSON.parse(response.responseText);
+  self.transcript.unshift(row);
+  self.update_analysis(row);
+  return 0;
 };
 
 Transcript.prototype.latest = function(action){
@@ -397,8 +482,12 @@ Transcript.prototype.end_current_pivot = function(){
   console.log('ending pivot: ' + pivot.id + ' ' + pivot.description);
   var ref_id = pivot.id;
   var search = self.latest('SEARCH');
-  if (search && search.scope_id === scope_id)
+  if (search && search.scope_id === scope_id){
     ref_id = search.id;
+    console.log('found search ' + ref_id)
+  }
+  else if (search) console.log('search.scope_id', search.scope_id, 'scope_id', scope_id)
+    
 
   // Set pivot to none
   self.update('END', {

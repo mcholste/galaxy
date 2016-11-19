@@ -17,7 +17,7 @@ DEFAULT_LISTEN_PORT = 8080
 
 class App:
 	def __init__(self, conf, loop, port=DEFAULT_LISTEN_PORT):
-		self.log = logging.getLogger("elsa.app")
+		self.log = logging.getLogger("galaxy.app")
 		if conf.has_key("listen_port"):
 			port = conf["listen_port"]
 		self.port = port
@@ -45,7 +45,7 @@ class App:
 		self.loop.start()
 
 	def _init_db(self):
-		self.db = sqlite3.Connection("%s/elsa.db" % self.conf.get("db_path", "/tmp"))
+		self.db = sqlite3.Connection("%s/galaxy.db" % self.conf.get("db_path", "/tmp"))
 		# Set autocommit
 		self.db.isolation_level = None
 		

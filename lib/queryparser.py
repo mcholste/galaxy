@@ -15,7 +15,7 @@ class Parser:
 
 	operator = oneOf([":", "=", ">", "<", ">=", "<=", "!="])
 
-	viz_names = ["geomap", "sankey"]
+	viz_names = ["geomap", "sankey", "blocks"]
 	viz_parsers = []
 	for viz_name in viz_names:
 		viz_parsers.append(Group(PIPE + \
@@ -42,9 +42,10 @@ class Parser:
 	expr << (OneOrMore(clause) ^ nestedExpr('(', ')', content=expr))
 
 	DEFAULT_TIME_INTERVAL = 86400
+	DEFAULT_LIMIT = 100
 
 	def __init__(self):
-		self.log = logging.getLogger("elsa.parser")
+		self.log = logging.getLogger("galaxy.parser")
 
 	def parse(self, query_string, request):
 		# Sanitize by removing any double spaces
@@ -80,7 +81,13 @@ class Parser:
 		parsed = self.expr.parseString(query_string).asDict()
 		self.log.debug("raw parsed as %r" % parsed)
 
-		
+		self.log.debug("limit %r" % parsed.get("limit"))
+		limit = self.DEFAULT_LIMIT
+		if parsed.has_key("limit"):
+			limit = int(parsed["limit"][1])
+		offset = 0
+		if parsed.has_key("offset"):
+			offset = int(parsed["offset"][1])
 
 		time_filter = {
 			"range": { "@timestamp": {
@@ -92,7 +99,7 @@ class Parser:
 
 		filters = [time_filter]
 
-		max_buckets = 100
+		max_buckets = limit
 
 		aggs = {
 			"date_histogram": {
@@ -146,6 +153,8 @@ class Parser:
 					
 		# Default is to groupby time histogram
 		return {
+				"size": limit,
+				"from": offset,
 				"query": {
 					"bool": {
 						"must": [
@@ -158,7 +167,7 @@ class Parser:
 							}
 						],
 						"filter": filters
-					}
+					},
 				},
 				"aggs": aggs
 			}, parsed

@@ -23,6 +23,23 @@
   color: white;
 }
 
+#viz_container {
+  position: relative;
+}
+
+#viz_container .link {
+  fill: none;
+  stroke: white;
+  color: white;
+}
+
+#event_fields {
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: white;
+}
+
 #transcript_graph .link:hover {
   text-shadow: 0 0 5px gold;
   cursor: pointer;

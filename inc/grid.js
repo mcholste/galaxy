@@ -1,5 +1,10 @@
 var viz_map = {
-  sankey: build_sankey
+  aggregations: {
+    sankey: build_sankey,
+  },
+  flat: {
+    blocks: force_rectangles
+  }
 };
 
 var TRANSCRIPT = [];
@@ -116,19 +121,30 @@ function show_scope_nav(){
 
 function rocketship(){
   var div = document.createElement('div');
-  $(div).attr('style', 'position: absolute; top: 200px; left: 0; background-color: none;');
+  $(div).attr('style', 'position: absolute; top: 800px; left: 0; background-color: none;');
   var i = document.createElement('i');
   $(i).addClass('fa fa-rocket fw');
   $(i).attr('style', 'color: white; font-size: 10em; transform: rotate(45deg);');
   $(div).append(i);
   var textdiv = document.createElement('div');
-  $(textdiv).text('OMG SO TIRED');
+  $(textdiv).text('LOADING...');
   $(textdiv).addClass('overwatch');
   $(textdiv).attr('style', 'font-size: 60px; color: white;');
   $(div).append(textdiv);
   $(document.body).append(div);
-  $(div).animate({left: $(window).width() + 'px'}, 4000, function(){
-    //$(div).remove();
+
+  var margin = 100;
+  $(div).animate({left: window.innerWidth - (2 * margin) + 'px'}, 4000, function(){
+    $(i).attr('style', 'color: white; font-size: 10em; transform: rotate(-45deg);');
+  }); 
+  $(div).animate({top: margin + 'px'}, 4000, function(){
+    $(i).attr('style', 'color: white; font-size: 10em; transform: rotate(-135deg);');
+  });
+  $(div).animate({left: margin + 'px'}, 4000, function(){
+    $(i).attr('style', 'color: white; font-size: 10em; transform: rotate(135deg);');
+  });
+  $(div).animate({top: '800px'}, 4000, function(){
+    $(div).remove();
   });
 }
 
@@ -201,7 +217,8 @@ $(document).on('ready', function(){
   $('#end_date').val('2016-09-06T14:47:00');
   //$('#start_date').datepicker();
   //$('#end_date').datepicker();
-  $('#search_form input[name="query"]').val('_exists_:proto | groupby srcip,name,dstip | sankey');
+  //$('#search_form input[name="query"]').val('_exists_:proto | groupby srcip,name,dstip | sankey');
+  $('#search_form input[name="query"]').val('192.168.3.10 | limit 100 | blocks');
   $('#query_submit').on('click', submit_form);
 });
 
@@ -307,10 +324,15 @@ function render_search_result(data, status, xhr){
     console.log(data.query.viz);
     for (var i = 0, len = data.query.viz.length; i < len; i++){
       var viz = data.query.viz[i][0];
-      for (var k in data.results.aggregations){
-        if (k === 'date_histogram') continue;
-        var graph = build_graph_from_hits(data.results.aggregations[k].buckets);
-        viz_map[viz](graph);
+      if (typeof(viz_map.aggregations[viz]) !== 'undefined'){
+        for (var k in data.results.aggregations){
+          if (k === 'date_histogram') continue;
+          var graph = build_graph_from_hits(data.results.aggregations[k].buckets);
+          viz_map.aggregations[viz](graph);
+        }
+      }
+      else {
+        viz_map.flat[viz](data.results);
       }
     }
   }
@@ -464,7 +486,8 @@ function handle_context_menu_callback(key, options) {
       description: content, 
       results_id: item.id, 
       scope_id: scope_id,
-      ref_id: scope ? scope.id : undefined
+      //ref_id: scope ? scope.id : undefined
+      ref_id: item.id
     }, function(err, data){
       if (err) return;
       console.log('action', action);
