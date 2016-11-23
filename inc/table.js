@@ -159,6 +159,13 @@ function get_table(data, full_data, onclicks, onhovers, reorder, sortby, sortdir
   var tbody_el = document.createElement('tbody');
   $(tbody_el).addClass('context-menu-one');
 
+  var tag_values = {};
+  for (var tag in TAGS){
+    for (var tag_value in TAGS[tag]){
+      tag_values[tag_value] = 1;
+    }
+  }
+
   for (var i = 0, len = data.length; i < len; i++){
     var tr_el = document.createElement('tr');
     //$(tr_el).addClass('etch-complex-table__tbody__row');
@@ -204,15 +211,27 @@ function get_table(data, full_data, onclicks, onhovers, reorder, sortby, sortdir
         td_el.appendChild(text_el);
       }
 
-      for (var tag in TAGS){
-        for (var tag_value in TAGS[tag]){
-          if (text == tag_value){
-            tag_text = document.createElement('span');
-            tag_text.innerText = '#' + tag + ' ';
-            $(tag_text).addClass('tag');
-            td_el.appendChild(tag_text);
-          }
-        }
+      // Apply tags
+      if (typeof(tag_values[text]) !== 'undefined'){
+        tag_text = document.createElement('span');
+        tag_text.innerText = '#' + tag + ' ';
+        $(tag_text).addClass('tag');
+        td_el.appendChild(tag_text);
+      }
+      
+      // Apply favorites
+      if (typeof(FAVORITES[text]) !== 'undefined'){
+        var i = document.createElement('i');
+        $(i).addClass('fa fa-heart fa-fw icon-tag');
+        td_el.appendChild(i);
+      }
+    
+      // Apply pivot as tag
+      var pivot = TRANSCRIPT.latest('PIVOT');
+      if (pivot && text === pivot.description){
+        var i = document.createElement('i');
+        $(i).addClass('fa fa-code-fork fa-fw icon-tag');
+        td_el.appendChild(i);
       }
       
       tr_el.appendChild(td_el);

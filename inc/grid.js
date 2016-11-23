@@ -148,6 +148,40 @@ function rocketship(){
   });
 }
 
+function rocketships(){
+  var div = document.createElement('div');
+  $(div).attr('style', 'position: absolute; top: 400px; left: 0; background-color: none;');
+  var baseline_size = 3;
+  var baseline_shift = 50;
+  var width = $(window).width();
+  //for (var i = 1; i < 6; i++){
+  for (var i = 6; i > 0; i--){
+    var img = document.createElement('i');
+    $(img).addClass('fa fa-rocket fw');
+    $(img).attr('style', 'color: white; font-size: ' + (baseline_size * i) + 
+      'em; transform: rotate(-45deg); position: absolute; left:' + ((width / 2) - ((baseline_shift * i) * Math.sqrt(i))) + 'px;');
+      //' translate(' + (i * baseline_shift) + 'px, ' + (i * baseline_shift) + 'px);');
+    $(div).append(img);
+    $(img).animate({left: width - (width/2) - $(img).width() + ((baseline_shift * i) * Math.sqrt(i))}, 4000);
+  }
+  $(document.body).append(div);
+
+  // var margin = 100;
+  // $(div).animate({left: window.innerWidth - (2 * margin) + 'px'}, 4000, function(){
+  //   $(i).attr('style', 'color: white; font-size: 10em; transform: rotate(-45deg);');
+  // }); 
+  // $(div).animate({top: margin + 'px'}, 4000, function(){
+  //   $(i).attr('style', 'color: white; font-size: 10em; transform: rotate(-135deg);');
+  // });
+  // $(div).animate({left: margin + 'px'}, 4000, function(){
+  //   $(i).attr('style', 'color: white; font-size: 10em; transform: rotate(135deg);');
+  // });
+  // $(div).animate({top: '800px'}, 4000, function(){
+  //   $(div).remove();
+  // });
+}
+
+
 function show_main_nav(){
   TOGGLE = null;
   ['pulldown', 'histogram_container', 'viz_container', 'grid_container'].forEach(function(x){
@@ -161,7 +195,9 @@ function show_main_nav(){
 $(document).on('ready', function(){
   $('#logo').click(rocketship);
   var img = document.createElement('img');
-  img.src = 'inc/background.jpg';
+  //img.src = 'inc/background.jpg';
+  //img.src = 'inc/background-1.png';
+  img.src = 'inc/background-2.jpg';
   img.id = 'galaxy_background';
   $(img).addClass('body-background-img');
   $(document.body).append(img);
@@ -182,16 +218,16 @@ $(document).on('ready', function(){
     update_tags();
     // Update context menu
     CONTEXT_MENU_ITEMS = {
-      pivot: {name: 'Pivot', icon: function(){ return 'fa fa-level-down fa-fw'} },
+      pivot: {name: 'Pivot', icon: function(){ return 'fa fa-level-down'} },
       sep: '-----',
-      scope: {name: 'Scope', icon: function(){ return 'fa fa-binoculars fa-fw'} },
+      scope: {name: 'Scope', icon: function(){ return 'fa fa-binoculars'} },
       sep1: '-----',
-      note: {name: 'Note', icon: function(){ return 'fa fa-comment fa-fw'} },
+      note: {name: 'Note', icon: function(){ return 'fa fa-comment'} },
       sep2: '-----',
-      new_tag: {name: 'New Tag', icon: function(){ return 'fa fa-hashtag fa-fw'} },
+      new_tag: {name: 'New Tag', icon: function(){ return 'fa fa-hashtag'} },
       existing_tags: { name: 'Tags:', items: {} },
       sep3: '-----',
-      favorite: {name: 'Favorite', icon: function(){ return 'fa fa-star fa-fw'} },
+      favorite: {name: 'Favorite', icon: function(){ return 'fa fa-star'} },
     };
     for (var tag in TAGS){
       CONTEXT_MENU_ITEMS.existing_tags.items[tag] = {

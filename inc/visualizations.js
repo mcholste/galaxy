@@ -330,7 +330,7 @@ function build_c3_multi_histogram(data){
         value: combined_fields
       },
       xFormat: '%Y-%m-%dT%H:%M:%S.%LZ',
-      type: 'bar',
+      type: 'spline',
       types: fields['host'],
       groups: [
         Object.keys(fields['host']),
@@ -345,6 +345,16 @@ function build_c3_multi_histogram(data){
         }
       }
     }
+  });
+  $(div).hover(function(){
+    $('.c3-axis line, .c3-axis text, .c3-axis path')
+      .filter(function(){ return $(this).css('opacity') == .5 })
+      .each(function(){ $(this).css('opacity', 1)});
+  },
+  function(){
+    $('.c3-axis line, .c3-axis text, .c3-axis path')
+      .filter(function(){ return $(this).css('opacity') == 1 })
+      .each(function(){ $(this).css('opacity', .5)});
   });
 }
 
@@ -578,12 +588,13 @@ function build_sankey(graph){
   }
 }
 
-function make_two_dimensional(records){
+function make_two_dimensional(records, max_size){
+  if (!max_size) max_size = 25;
   // Given an array of records, return two dimensions.
   // The first is total bytes, the second is total fields.
   var nodes = [];
-  var max_height = 25;
-  var max_width = 25;
+  var max_height = max_size;
+  var max_width = max_size;
   // Find max values
 
   var top_height = 0;
@@ -625,8 +636,8 @@ var display_fields = [
   'txhosts',
   'uri',
   'status_code',
-  'user_agent',
-  '@message'
+  'user_agent'//,
+  //'@message'
 ];
 
 var similarity_fields = [
@@ -645,7 +656,8 @@ var similarity_fields = [
   'uri',
   'status_code',
   'user_agent',
-  '@message'
+  '@message',
+  'answer'
 ];
 
 function build_links(nodes, d){
@@ -717,8 +729,13 @@ function build_links(nodes, d){
 }
 
 function force_rectangles(results){
+  var width = $('#viz_container').width();
+  //var max_size = Math.floor(width / results.hits.hits.length);
+  var max_size = 25;
+  var height = width / 4;
+  $('#viz_container').height(height);
   console.log('results.hits.hits', results.hits.hits);
-  var nodes = make_two_dimensional(results.hits.hits);
+  var nodes = make_two_dimensional(results.hits.hits, max_size);
   var start = new Date();
   var max_links = 0;
   for (var i = 0, len = nodes.length; i < len; i++){
@@ -737,11 +754,46 @@ function force_rectangles(results){
       width = $('#viz_container').width() - margin.left - margin.right,
       height = $('#viz_container').height() - margin.top - margin.bottom;
   console.log('width', width, 'height', height);
-   
+
+  var min_timestamp = new Date().getTime();
+  var max_timestamp = 0;
+  nodes.forEach(function(o){
+    o.ts = moment(o._source['@timestamp']).unix() * 1000;
+    console.log('ts', o.ts, o._source['@timestamp'], o._source['orig_@timestamp']);
+    if (o.ts > max_timestamp)
+      max_timestamp = o.ts;
+    if (o.ts < min_timestamp)
+      min_timestamp = o.ts;
+    o.ts = new Date(o.ts);
+  });
+  var ts_scale = max_timestamp - min_timestamp;
+  console.log('ts_scale', ts_scale, 'min', min_timestamp, 'max', max_timestamp);
+  var time_scale = d3.time.scale()
+    .domain([new Date(min_timestamp), new Date(max_timestamp)])
+    .range([margin.left, width - (margin.right * 2)]);
+  if (!ts_scale){
+    // Min and max times were the same, use random x values
+    nodes.forEach(function(o){
+      o.ts = Math.random() * width;
+    });
+    time_scale = d3.scale.linear()
+      .domain([0, width])
+      .range([margin.left, width - (margin.right * 2)]);
+  }
+
+  nodes.forEach(function(o){
+    console.log('ts', o.ts, time_scale(o.ts));
+  });
+
+  var x_axis = d3.svg.axis()
+    .orient('bottom')
+    .scale(time_scale);
+     
   var formatNumber = d3.format(",.0f"),    // zero decimal places
       format = function(d) { return formatNumber(d) + " " + units; },
       //color = d3.scaleOrdinal(d3.schemeCategory20);
       color = d3.scale.category20();
+ 
 
   // var el = document.createElement('div');
   // el.id = 'chart';
@@ -753,8 +805,22 @@ function force_rectangles(results){
   event_div.id = 'event_fields';
   $("#viz_container").append(event_div);
   var svg = d3.select("#viz_container").append("svg")
+    //.attr('style', 'position: absolute; top: 0;')
+    .attr('id', 'blocks_viz')
     .attr("width", width + margin.left + margin.right)
     .attr("height", height + margin.top + margin.bottom);
+  if (ts_scale){
+    // time_scale.tickFormat(d3.time.format('%Y-%m-%dT%H:%M:%S.%L'));
+    // x_axis.tickFormat(d3.time.format('%Y-%m-%dT%H:%M:%S.%L'));
+    svg.append('g')
+      .attr('class', 'xaxis')
+      .attr("transform", "translate(0," + (height - (margin.bottom * 8)) + ")")
+      .call(x_axis);
+    svg.selectAll(".xaxis text")  // select all the text elements for the xaxis
+      .attr("transform", function(d) {
+          return "translate(" + this.getBBox().height*-2 + "," + this.getBBox().height + ")rotate(-45)";
+    });
+  }
 
   svg.append("text").attr('class', 'display_banner')
     .attr('x', margin.left)
@@ -769,6 +835,13 @@ function force_rectangles(results){
     .links(links)
     .nodes(nodes)
     .start();
+
+  // var started = new Date();
+  // var ticks = Math.pow(nodes.length, 4);
+  // for (var i = 0; i < ticks; i++) force.tick();
+  // var took = new Date().getTime() - started.getTime();
+  // console.log('Ticked ' + nodes.length + ' nodes for ' + ticks + ' in ' + took + ' ms');
+  // force.stop();
    
   var node = svg.selectAll(".node")
     .data(nodes)
@@ -782,60 +855,148 @@ function force_rectangles(results){
   var link = svg.selectAll(".link")
     .attr("class", "link");
 
+  var selected_toggle = -1;
+
   node
     .append('rect')
     //.attr('width', function(d) { return d.width; })
-    .attr('width', function(d) { return 25 * (d.links.length / max_links); })
+    .attr('width', function(d) { return max_size * (d.links.length / max_links); })
     .attr('height', function(d) { return d.height; })
     .attr('destination_x', function(d){ return Math.random() * width })
     .attr('label', function(d){ return d._source['@message']})
-    // .on('mouseover', function(d){
-    //   //d3.select('.display_banner').text(d._source['@message']);
-    //   $('#event_fields').empty();
-    //   var table = document.createElement('table');
-    //   var tbody = document.createElement('tbody');
-    //   table.appendChild(tbody);
-    //   for (var i = 0, len = display_fields.length; i < len; i++){
-    //     if (typeof(d._source[ display_fields[i] ]) === 'undefined') continue;
-    //     var tr = document.createElement('tr');
-    //     var td = document.createElement('td');
-    //     $(td).text(display_fields[i]);
-    //     tr.appendChild(td);
-    //     td = document.createElement('td');
-    //     $(td).text(d._source[ display_fields[i] ]);
-    //     tr.appendChild(td);
-    //     tbody.appendChild(tr);
-    //   }
-    //   tr = document.createElement('tr');
-    //   td = document.createElement('td');
-    //   $(td).text('links');
-    //   tr.appendChild(td);
-    //   td = document.createElement('td');
-    //   $(td).text(JSON.stringify(d.links));
-    //   tr.appendChild(td);
-    //   tbody.appendChild(tr);
-    //   $('#event_fields').append(table);
-    // })
-    // .on('mouseout', function(d){
-    //   //d3.select('.display_banner').text('');
-    //   $('#event_fields').empty();
-    // })
-    .on('click', function(d){
+    .on('mouseover', function(d){
+      if (selected_toggle >= 0) return;
+      //d3.select('.display_banner').text(d._source['@message']);
+      $('#event_fields').empty();
+      var table = document.createElement('table');
+      $(table).addClass('field-table');
+      $(table).width('250px');
+      //$(table).attr('style', 'table-layout: fixed;')
+      var tbody = document.createElement('tbody');
+      table.appendChild(tbody);
+      for (var i = 0, len = display_fields.length; i < len; i++){
+        if (typeof(d._source[ display_fields[i] ]) === 'undefined') continue;
+        var tr = document.createElement('tr');
+        var td = document.createElement('td');
+        $(td).text(display_fields[i]);
+        tr.appendChild(td);
+        td = document.createElement('td');
+        var div = document.createElement('div');
+        $(div).text(d._source[ display_fields[i] ]);
+        $(div).addClass('selectable');
+        
+        // $(div).click(function(e){
+        //   var d = this[0];
+        //   var div = this[1];
+        //   e.preventDefault();
+        //   console.log('clicked', d);
+        //   var table = document.createElement('table');
+        //   var tbody = document.createElement('tbody');
+        //   var tr = document.createElement('tr');
+        //   ['pivot', 'search or', 'search and'].forEach(function(action_text){
+        //     var td = document.createElement('td');
+        //     var div = document.createElement('div');
+        //     $(div).addClass('button');
+        //     $(div).text(action_text);
+        //     $(div).click(function(e){
+        //       e.preventDefault();
+        //       console.log(action_text, d);
+        //     });
+        //     td.appendChild(div);
+        //     tr.appendChild(td);
+        //     tbody.appendChild(tr);
+        //   });
+        //   table.appendChild(tbody);
+        //   $(table).hide();
+        //   div.appendChild(table);
+        //   $(table).show(250);
+        //   $(div).append(table);
+        // }.bind([d,div]));
+
+        $.contextMenu({
+          selector: '.field-table .selectable',
+          callback: handle_context_menu_callback,
+          items: CONTEXT_MENU_ITEMS,
+          className: 'custom-context-menu'
+        });
+        td.appendChild(div);
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+      }
+      // tr = document.createElement('tr');
+      // td = document.createElement('td');
+      // $(td).text('links');
+      // tr.appendChild(td);
+      // td = document.createElement('td');
+      // $(td).text(JSON.stringify(d.links));
+      // tr.appendChild(td);
+      // tbody.appendChild(tr);
+      $('#event_fields').append(table);
+    })
+    .on('mouseout', function(d){
+      if (selected_toggle >= 0) return;
+      //d3.select('.display_banner').text('');
+      $('#event_fields').empty();
+    })
+  
+    node.on('click', function(d){
+      if (selected_toggle === d.index){
+        // Reset all links
+        links = [];
+        force.links(links);
+        link = link.data(force.links(), function(d) { return d.source + "-" + d.target; });
+        link.enter().insert("line", ".node").attr("class", "link");
+        link.exit().remove();
+        node.style('opacity', 1);
+        node.style('fill', function(d){ return color(d._source['class']); });
+        node.style('stroke', function(d){ return color(d._source['class']); });
+        force.start();
+        force.tick();
+        force.stop();
+        selected_toggle = -1;
+        return;
+      }
       links = build_links(nodes, d);
+      var neighbors = {};
+      neighbors[d.index] = true;
+      for (var i = 0, len = links.length; i < len; i++){
+        if (d.index === links[i].source) neighbors[ links[i].target ] = true;
+        else neighbors[ links[i].source ] = true;
+      }
       //links = d.links;
-      console.log('links', links);
       force.links(links);
       link = link.data(force.links(), function(d) { return d.source + "-" + d.target; });
       link.enter().insert("line", ".node").attr("class", "link");
       link.exit().remove();
-      console.log('link', link);
+      
+            
+      node.style('opacity', function(d){
+        if (typeof(neighbors[ d.index ]) !== 'undefined') return 1;
+        return .25;
+      });
+      node.style('fill', function(d){
+        if (typeof(neighbors[ d.index ]) !== 'undefined') return color(d._source['class']);
+        return 'none';
+      });
+      node.style('stroke', function(d){ return color(d._source['class']); });
+
+      // Set the nodes to static so they don't move with the new links
+      node.each(function(d){ d.fixed = true; });
+      // Render
       force.start();
-      // link = svg.selectAll(".link")
-      //   .data(links)
-      //   .enter().append("line")
-      //   .attr("class", "link");
+      force.tick();
+      force.stop();
+        // link = svg.selectAll(".link")
+        //   .data(links)
+        //   .enter().append("line")
+        //   .attr("class", "link");
+
+      selected_toggle = d.index;
+
+
     })
     .style('fill', function(d, i) { return color(d._source['class']); })
+    .style('stroke', function(d, i) { return color(d._source['class']); })
     .attr('transform', function(d) { return 'translate(' + (-d.width / 2) + 
       ',' + (-d.height / 2) + ')'; })
   
@@ -844,31 +1005,22 @@ function force_rectangles(results){
   // node.append('text')
   //   .text(function(d){ return d._source['@message']})
   //   .style({opacity:0.0})
-  var min_timestamp = new Date().getTime() / 1000;
-  var max_timestamp = 0;
-  nodes.forEach(function(o){
-    var ts = moment(o._source['@timestamp']).unix();
-    console.log('ts', ts, o._source['@timestamp'], o._source['orig_@timestamp']);
-    if (ts > max_timestamp)
-      max_timestamp = ts;
-    if (ts < min_timestamp)
-      min_timestamp = ts;
-  });
-  var ts_scale = max_timestamp - min_timestamp;
-  console.log('ts_scale', ts_scale);
+  
   nodes.forEach(function(o){
     //o.destination_x = Math.random() * width;
-    var ts = moment(o._source['@timestamp']).unix();
-    if (ts_scale){
-      ts = moment(o._source['@timestamp']).unix() - min_timestamp;
-      o.destination_x = width * ts / ts_scale;
-      o.destination_y = Math.random() * height * .1;
-    }
-    else {
-      ts = moment(o._source['@timestamp']).unix() - min_timestamp;
-      o.destination_x = Math.random() * width;
-      o.destination_y = Math.random() * height * .1; 
-    }
+    o.destination_x = time_scale(o.ts);
+    o.destination_y = Math.random() * height;
+    // var ts = moment(o._source['@timestamp']).unix();
+    // if (ts_scale){
+    //   ts = moment(o._source['@timestamp']).unix() - min_timestamp;
+    //   o.destination_x = width * ts / ts_scale;
+    //   o.destination_y = Math.random() * height * .1;
+    // }
+    // else {
+    //   ts = moment(o._source['@timestamp']).unix() - min_timestamp;
+    //   o.destination_x = Math.random() * width;
+    //   o.destination_y = Math.random() * height * .1; 
+    // }
   });
 
   force.on('tick', function(e) {
@@ -878,6 +1030,15 @@ function force_rectangles(results){
       o.y += (o.destination_y - o.y) * k;
       o.x += (o.destination_x - o.x) * k;
     });
+
+    var q = d3.geom.quadtree(nodes),
+      i = 0,
+      n = nodes.length;
+
+    while (++i < n) {
+      q.visit(collide(nodes[i]));
+    }
+
     svg.selectAll('rect')
       .attr('x', function(d) { return d.x; })
       .attr('y', function(d) { return d.y; });
@@ -891,8 +1052,6 @@ function force_rectangles(results){
     //   .attr('x', function(d) { return d.x; })
     //   .attr('y', function(d) { return d.y; });
   });
-
-  force.start();
 
   function collide(node) {
     return function(quad, x1, y1, x2, y2) {
@@ -933,5 +1092,10 @@ function force_rectangles(results){
       return updated;
     };
   }
+
+  // force.start();
+  // force.tick();
+  // force.stop();
+
 
 }

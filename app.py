@@ -29,6 +29,8 @@ class App:
 			(r"/search(.*)", SearchHandler, {"conf": conf, "loop": loop, "db": self.db }),
 			(r"/inc/(.*)", StaticHandler, 
 				dict(path=os.path.join(os.path.dirname(__file__), "inc"))),
+			(r"/fonts/(.*)", StaticHandler, 
+				dict(path=os.path.join(os.path.dirname(__file__), "inc"))),
 			("/transcript", TranscriptHandler, dict(db=self.db)),
 			("/tags", TagsHandler, dict(db=self.db)),
 			("/favorites", FavoritesHandler, dict(db=self.db)),

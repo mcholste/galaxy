@@ -117,6 +117,13 @@ Transcript.prototype.visualize = function(dom_element){
     .links(self.links)
     .start();
 
+  var started = new Date();
+  var ticks = Math.pow(self.nodes.length, 3);
+  for (var i = 0; i < ticks; i++) force.tick();
+  var took = new Date().getTime() - started.getTime();
+  console.log('Ticked ' + self.nodes.length + ' nodes for ' + ticks + ' in ' + took + ' ms');
+  force.stop();
+
   var link = svg.selectAll(".link")
     .data(self.links)
     .enter().append("line")
@@ -220,42 +227,45 @@ Transcript.prototype.visualize = function(dom_element){
     //node.selectAll('.label').each(collide(0.5));
   });
 
-  force.on('end', function(){ 
-    console.log('end');
-    node.selectAll('.label').each(function(d){
-      var outer = this;
-      console.log(d.x, d.y, this.scrollHeight, this.scrollWidth);
-      var x1 = d.x;
-      var x2 = d.x + this.scrollWidth + 1;
-      var y1 = d.y;
-      var y2 = d.y + this.scrollHeight + 1;
-      node.selectAll('.label').each(function(d){
-        if (this === outer) return;
-        var inner_x1 = d.x;
-        var inner_x2 = d.x + this.scrollWidth + 1;
-        var inner_y1 = d.y;
-        var inner_y2 = d.y + this.scrollHeight + 1;
+  // force.on('end', function(){ 
+  //   console.log('end');
+  //   node.selectAll('.label').each(function(d){
+  //     var outer = this;
+  //     console.log(d.x, d.y, this.scrollHeight, this.scrollWidth);
+  //     var x1 = d.x;
+  //     var x2 = d.x + this.scrollWidth + 1;
+  //     var y1 = d.y;
+  //     var y2 = d.y + this.scrollHeight + 1;
+  //     node.selectAll('.label').each(function(d){
+  //       if (this === outer) return;
+  //       var inner_x1 = d.x;
+  //       var inner_x2 = d.x + this.scrollWidth + 1;
+  //       var inner_y1 = d.y;
+  //       var inner_y2 = d.y + this.scrollHeight + 1;
         
-        if (inner_x1 >= x1 && inner_x1 <= x2 && inner_y1 >= y1 && inner_y1 <= y2){
-          d.x += 5;
-          d.y += 5;
-        }
-        else if (inner_x1 >= x1 && inner_x1 <= x2 && inner_y2 >= y1 && inner_y2 <= y2){
-          d.x += 5;
-          d.y -= 5;
-        }
-        else if (inner_x2 >= x1 && inner_x2 <= x2 && inner_y1 >= y1 && inner_y1 <= y2){
-          d.x -= 5;
-          d.y += 5;
-        }
-        else if (inner_x2 >= x1 && inner_x2 <= x2 && inner_y2 >= y1 && inner_y2 <= y2){
-          d.x -= 5;
-          d.y -= 5;
-        }
-        node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
-      });
-    });
-  });
+  //       if (inner_x1 >= x1 && inner_x1 <= x2 && inner_y1 >= y1 && inner_y1 <= y2){
+  //         d.x += 5;
+  //         d.y += 5;
+  //       }
+  //       else if (inner_x1 >= x1 && inner_x1 <= x2 && inner_y2 >= y1 && inner_y2 <= y2){
+  //         d.x += 5;
+  //         d.y -= 5;
+  //       }
+  //       else if (inner_x2 >= x1 && inner_x2 <= x2 && inner_y1 >= y1 && inner_y1 <= y2){
+  //         d.x -= 5;
+  //         d.y += 5;
+  //       }
+  //       else if (inner_x2 >= x1 && inner_x2 <= x2 && inner_y2 >= y1 && inner_y2 <= y2){
+  //         d.x -= 5;
+  //         d.y -= 5;
+  //       }
+  //       node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+  //     });
+  //   });
+  // });
+  force.start();
+  force.tick();
+  force.stop();
 
 };
 
