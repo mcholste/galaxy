@@ -7,6 +7,7 @@ import base64
 import copy
 import socket
 import struct
+import random
 from functools import partial
 from time import time
 
@@ -324,8 +325,10 @@ class StaticHandler(BaseWebHandler):
 			"css": "text/css",
 			"html": "text/html",
 			"js": "application/javascript",
+			"map": "application/javascript",
 			"png": "image/png",
 			"woff": "application/octet-stream",
+			"woff2": "application/octet-stream",
 			"jpg": "image/jpeg"
 		}
 
@@ -338,8 +341,25 @@ class StaticHandler(BaseWebHandler):
 		extension = path.split(".")[-1]
 		self.mimetype = self.mimemap[extension]
 		self.set_header("Content-Type", self.mimetype)
-		self.set_header("Cache-Control", "no-cache")
 		self.write(open(self.content_dir + "/" + path).read())
+
+class BackgroundHandler(StaticHandler):
+	def __init__(self, *args, **kwargs):
+		super(BackgroundHandler, self).__init__(*args, **kwargs)
+		
+	def initialize(self, *args, **kwargs):
+		#super(BackgroundHandler, self).initialize(*args, **kwargs)
+		self.backgrounds = kwargs["backgrounds"]
+		
+	def get(self):
+		id = int(self.get_argument("t", 0))
+		background = self.backgrounds[ id % len(self.backgrounds) ]
+		print background
+		extension = background.split(".")[-1]
+		self.mimetype = self.mimemap[extension]
+		self.set_header("Content-Type", self.mimetype)
+		self.set_header("Cache-Control", "no-cache")
+		self.write(open(background).read())
 
 class TranscriptHandler(BaseWebHandler):
 	def __init__(self, application, request, **kwargs):

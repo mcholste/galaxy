@@ -30,6 +30,7 @@ var POPOUT_WINDOW;
 var TOGGLE = null;
 
 $( document ).ajaxStart(function() {
+  rotate_background();
   $('#modal').empty();
   var icon = document.createElement('span');
   $('#modal_outer').removeClass('background').addClass('foreground');
@@ -192,15 +193,24 @@ function show_main_nav(){
   $('#scope_nav_button').removeClass('golden');
 }
 
-$(document).on('ready', function(){
-  $('#logo').click(rocketship);
+
+function rotate_background(){
+  var t = 0;
+  var current = $('#galaxy_background').attr('src');
+  if (current) t = parseInt(current.split('?t=')[1]);
+  $('#galaxy_background').remove();
   var img = document.createElement('img');
-  //img.src = 'inc/background.jpg';
-  //img.src = 'inc/background-1.png';
-  img.src = 'inc/background-2.jpg';
+  img.src = 'background?' + 't=' + parseInt(t + 1);
   img.id = 'galaxy_background';
   $(img).addClass('body-background-img');
   $(document.body).append(img);
+}
+
+$(document).on('ready', function(){
+  $('#logo').click(rocketship);
+  rotate_background();
+  //setInterval(rotate_background, 10000);
+
   $('#main_nav_button').click(function(e){
     e.preventDefault();
     show_main_nav();

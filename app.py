@@ -25,12 +25,19 @@ class App:
 		self.conf = conf
 		self._init_db()
 
+		backgrounds = []
+		background_dir = os.path.join(os.path.dirname(__file__), "inc/backgrounds")
+		for dir in os.walk(background_dir):
+			for filename in dir[2]:
+				backgrounds.append(os.path.join(background_dir, filename))
+
 		tornado_config = [
 			(r"/search(.*)", SearchHandler, {"conf": conf, "loop": loop, "db": self.db }),
 			(r"/inc/(.*)", StaticHandler, 
 				dict(path=os.path.join(os.path.dirname(__file__), "inc"))),
 			(r"/fonts/(.*)", StaticHandler, 
 				dict(path=os.path.join(os.path.dirname(__file__), "inc"))),
+			(r"/background", BackgroundHandler, dict(backgrounds=backgrounds)),
 			("/transcript", TranscriptHandler, dict(db=self.db)),
 			("/tags", TagsHandler, dict(db=self.db)),
 			("/favorites", FavoritesHandler, dict(db=self.db)),
