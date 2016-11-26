@@ -49,7 +49,6 @@ Transcript.prototype.update_analysis = function(data){
         source = i;
         break;
       }
-      else { console.log(self.nodes[i].data.id + ' was not ' + data.ref_id)}
     }
     // if (typeof(data.referenced_search_description) !== 'undefined')
     //   source = data.referenced_search_description;

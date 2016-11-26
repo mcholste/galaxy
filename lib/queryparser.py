@@ -110,13 +110,15 @@ class Parser:
 				"aggs": {
 					"host": {
 						"terms": {
-							"field": "raw.host",
+							#"field": "raw.host",
+							"field": "host",
 							"size": max_buckets
 						}
 					},
 					"class": {
 						"terms": {
-							"field": "raw.class",
+							#"field": "raw.class",
+							"field": "class",
 							"size": max_buckets
 						}
 					}

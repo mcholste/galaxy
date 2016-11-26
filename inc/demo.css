@@ -17,6 +17,12 @@
   color: white;
 }
 
+.g-link text {
+  display: none;
+  font-family: Overwatch;
+  font-size: 10px;
+}
+
 #transcript_graph .link {
   fill: none;
   stroke: white;
