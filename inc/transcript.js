@@ -510,6 +510,165 @@ Transcript.prototype.end_current_pivot = function(){
   });
 }
 
+
+Transcript.prototype.create_alert_menu_callback = function(key, options){
+  var self = this[0];
+  var data = this[1];
+  console.log(this, key, options);
+
+  var div = document.createElement('div');
+  div.id = 'create-alert';
+  div.title = key;
+  var span = document.createElement('h1');
+  span.innerText = key;
+  $(span).addClass('overwatch');
+  div.appendChild(span);
+  var form = document.createElement('form');
+  div.appendChild(form);
+  var fieldset = document.createElement('fieldset');
+  form.appendChild(fieldset);
+  var label = document.createElement('label');
+  label.innerHTML = 'Title';
+  fieldset.appendChild(label);
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.size = 80;
+  input.name = 'title';
+  input.id = 'title';
+  $(input).attr('class', 'text ui-widget-content ui-corner-all');
+  fieldset.appendChild(input);
+  var submit = document.createElement('input');
+  submit.type = 'submit';
+  $(submit).attr('tabindex', -1);
+  $(submit).attr('style', 'position:absolute; top:-1000px');
+  fieldset.appendChild(submit);
+
+
+  $('#transcript_container').append(div);
+
+  function on_submit(event){
+    var data = this;
+    event.preventDefault();
+    console.log('SUBMIT', this);
+    $.ajax('alerts', {
+      method: 'PUT',
+      data: {
+        title: $('#title').val(),
+        query: data.data
+      },
+      dataType: 'json',
+      success: function(data, status, xhr){
+        console.log(data, status);
+        self.callbacks.notify('Alert created');
+        dialog.dialog('close');
+        $('#create-alert').remove();
+      }
+    }).fail(function(e){
+      console.error(e);
+      var errstr = 'Unable to create alert';
+      console.error(errstr);
+      self.callbacks.error(errstr);
+      dialog.dialog('close');
+      $('#create-alert').remove();
+    });
+  }
+  // modal
+  var dialog; dialog = $( "#create-alert" ).dialog({
+    autoOpen: false,
+    height: 400,
+    width: 900,
+    modal: true,
+    buttons: {
+      "Ok": on_submit.bind(data),
+      Cancel: function() {
+        dialog.dialog( "close" );
+      }
+    },
+    close: function() {
+      form[ 0 ].reset();
+    }
+  });
+
+  var form; form = dialog.find( "form" ).on( "submit", on_submit);
+
+  //$( "#create-user" ).button().on( "click", function() {
+    dialog.dialog( "open" );
+
+  
+}
+
+Transcript.prototype.handle_search_context_menu_callback = function(key, options){
+  console.log(this, key, options);
+  var div = document.createElement('div');
+  div.id = 'create-alert';
+  div.title = title;
+  var span = document.createElement('h1');
+  span.innerText = content;
+  $(span).addClass('overwatch');
+  div.appendChild(span);
+  var form = document.createElement('form');
+  div.appendChild(form);
+  var fieldset = document.createElement('fieldset');
+  form.appendChild(fieldset);
+  var label = document.createElement('label');
+  label.innerHTML = 'Title';
+  fieldset.appendChild(label);
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.size = 80;
+  input.name = 'note';
+  input.id = 'note';
+  $(input).attr('class', 'text ui-widget-content ui-corner-all');
+  fieldset.appendChild(input);
+  var submit = document.createElement('input');
+  submit.type = 'submit';
+  $(submit).attr('tabindex', -1);
+  $(submit).attr('style', 'position:absolute; top:-1000px');
+  fieldset.appendChild(submit);
+  
+  $('#transcript_container').append(div);
+
+  function on_submit(event){
+    event.preventDefault();
+    console.log('SUBMIT', this);
+    TRANSCRIPT.update('NOTE', {
+      description: content + ' ' + $('#note').val(),
+      ref_id: TRANSCRIPT.latest('SEARCH').id,
+      scope_id: scope_id,
+      data: {
+        note: $('#note').val(),
+        value: content
+      }
+    }, function(err, data){
+      if (err) return;
+      dialog.dialog('close');
+      $('#write-note').remove();
+    });
+  }
+  // modal
+  var dialog; dialog = $( "#write-note" ).dialog({
+    autoOpen: false,
+    height: 400,
+    width: 900,
+    modal: true,
+    buttons: {
+      "Ok": on_submit,
+      Cancel: function() {
+        dialog.dialog( "close" );
+      }
+    },
+    close: function() {
+      form[ 0 ].reset();
+    }
+  });
+
+  var form; form = dialog.find( "form" ).on( "submit", on_submit);
+
+  //$( "#create-user" ).button().on( "click", function() {
+    dialog.dialog( "open" );
+  //});
+}
+
 Transcript.prototype.render = function(){
   var self = this;
 
@@ -581,6 +740,24 @@ Transcript.prototype.render = function(){
       throw Error('Invalid action ' + item.action);
     var icon = document.createElement('i');
     $(icon).addClass('fa ' + self.action_icons[item.action].name + ' fa-fw');
+    $(icon).click($.contextMenu({
+      selector: 'td',
+      trigger: 'left',
+      callback: self.handle_search_context_menu_callback.bind(item),
+      items: {
+        alert: {
+          name: 'Create Alert',
+          icon: function(){ return 'fa fa-flag fa-fw' },
+          callback: self.create_alert_menu_callback.bind([self, item])
+          //icon: 'fa-flag'
+        },
+        sep: '-----',
+        schedule: {
+          name: 'Schedule',
+          icon: function(){ return 'fa fa-history fa-fw' }
+        }
+      }
+    }));
     cell.appendChild(icon);
 
     var text = document.createTextNode(item.description);

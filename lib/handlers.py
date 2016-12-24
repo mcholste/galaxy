@@ -43,10 +43,12 @@ def merge(src, dst):
 
 TORNADO_ROUTE = "(.+)"
 DEFAULT_USER = "default"
+DEFAULT_ALERT_INTERVAL = 60
+DEFAULT_ALERT_THROTTLE = 0
 
 class BaseHandler(tornado.web.RequestHandler):
 	def initialize(self, conf,
-		loop=tornado.ioloop.IOLoop.instance()):
+		loop=tornado.ioloop.IOLoop.current()):
 		self.io_loop = loop
 		self.client = AsyncHTTPClient(self.io_loop)
 		self.passthrough_node = "%s:%d" % (conf["fed"]["host"], conf["fed"]["port"])
@@ -307,6 +309,9 @@ class BaseWebHandler(tornado.web.RequestHandler):
 	def initialize(self, *args, **kwargs):
 		super(BaseWebHandler, self).initialize()
 		self.log = logging.getLogger("galaxy.web.handler")
+		self.user = DEFAULT_USER
+		self.set_status(200)
+		self.set_header("Content-Type", "application/javascript")
 
 class IndexHandler(BaseWebHandler):
 	def initialize(self, filename, mimetype="text/html"):
@@ -606,7 +611,6 @@ class ScopesHandler(BaseWebHandler):
 		self.log = logging.getLogger("galaxy.scopes_handler")
 		self.db = kwargs["db"]
 
-
 	def initialize(self, *args, **kwargs):
 		super(ScopesHandler, self).initialize(*args, **kwargs)
 
@@ -634,3 +638,127 @@ class ScopesHandler(BaseWebHandler):
 		self.write(json.dumps({"ok": self.db.execute("DELETE FROM favorites " +\
 			"WHERE user_id=(SELECT id FROM users WHERE user=?) " +\
 			"AND value=?", (user, value)).rowcount}))
+
+class AlertGetterHandler(BaseWebHandler):
+	def __init__(self, application, request, **kwargs):
+		super(AlertGetterHandler, self).__init__(application, request, **kwargs)
+		self.log = logging.getLogger("galaxy.alert_getter_handler")
+		self.db = kwargs["db"]
+
+	def initialize(self, *args, **kwargs):
+		super(AlertGetterHandler, self).initialize(*args, **kwargs)
+		self.user = DEFAULT_USER
+		self.set_status(200)
+		self.set_header("Content-Type", "application/javascript")
+
+	def get(self):
+		limit = self.get_argument("limit", 50)
+		offset = self.get_argument("offset", 0)
+		rows = self.db.execute("SELECT * FROM alerts " +\
+			"WHERE user_id=(SELECT id FROM users WHERE user=?) " +\
+			"ORDER BY created DESC LIMIT ?,?", (self.user, offset, limit)).fetchall()
+		self.write(json.dumps(rows))
+
+	def put(self):
+		# params = json.loads(self.request.body)
+		# query = params["query"]
+		# title = params["title"]
+		query = self.get_argument("query")
+		title = self.get_argument("title")
+		interval = self.get_argument("interval", DEFAULT_ALERT_INTERVAL)
+		throttle = self.get_argument("throttle", DEFAULT_ALERT_THROTTLE)
+		id = self.db.execute("INSERT INTO alerts (user_id, title, query, created, interval, throttle) " +\
+			"VALUES((SELECT id FROM users WHERE user=?),?,?,?,?,?)",
+			(self.user, title, query, time(), interval, throttle)).lastrowid
+		self.write(json.dumps(
+			self.db.execute("SELECT * FROM alerts WHERE id=?", (id,)).fetchone()
+		))
+
+class AlertManagementHandler(BaseWebHandler):
+	def __init__(self, application, request, **kwargs):
+		super(AlertManagementHandler, self).__init__(application, request, **kwargs)
+		self.log = logging.getLogger("galaxy.alert_management_handler")
+		self.db = kwargs["db"]
+
+	def initialize(self, *args, **kwargs):
+		super(AlertManagementHandler, self).initialize(*args, **kwargs)
+		self.log.debug("args: %r, kwargs: %r" % (args, kwargs))
+		self.user = DEFAULT_USER
+		self.set_status(200)
+		self.set_header("Content-Type", "application/javascript")
+
+	def _prepare(self, args):
+		self.log.debug("type args: %s" % type(args))
+		self.log.debug("args: %r" % args)
+		self.id = int(args[0])
+		if len(args) > 1:
+			self.field = args[1]
+
+	def get(self, *args):
+		self._prepare(*args)
+		self.write(json.dumps(
+			self.db.execute("SELECT * FROM alerts WHERE user_id=" +\
+			"(SELECT id FROM users WHERE user=?) and id=?",
+			(self.user, self.id)).fetchone()
+		))
+
+	def delete(self, *args):
+		self._prepare(*args)
+		self.write(json.dumps(
+			{
+				"ok": self.db.execute("DELETE FROM alerts " +\
+					"WHERE user_id=(SELECT id FROM users WHERE user=?) " +\
+					"AND id=?", (self.user, self.id)).rowcount
+			}
+		))
+
+	def post(self, *args):
+		self._prepare(list(args))
+		if not self.field or \
+			self.field not in ["throttle", "active", "title", "query", "interval"]:
+			self._bad_request("Invalid field")
+			return;
+		value = self.get_argument("value")
+		if not value:
+			self._bad_request("No value.")
+			return
+		if self.field in ["throttle", "active", "interval"]:
+			try:
+				value = int(value)
+			except:
+				self._bad_request("Invalid value, must be numeric.")
+				return
+
+		#params = json.loads(self.request.body)
+		self.db.execute(("UPDATE alerts SET %s=?, updated=? WHERE id=? AND user_id=" +\
+			"(SELECT id FROM users WHERE user=?)") % self.field, (value, time(), self.id, self.user))
+		self.write(json.dumps(
+			self.db.execute("SELECT * FROM alerts WHERE id=? AND user_id=" +\
+				"(SELECT id FROM users WHERE user=?)", (self.id, self.user)).fetchone()
+		))
+
+
+class NotificationsHandler(BaseWebHandler):
+	def __init__(self, application, request, **kwargs):
+		super(NotificationsHandler, self).__init__(application, request, **kwargs)
+		self.log = logging.getLogger("galaxy.notifications_handler")
+		self.db = kwargs["db"]
+
+	def get(self):
+		limit = self.get_argument("limit", 50)
+		inactive = self.get_argument("all", None)
+		clause = "active=1"
+		if inactive:
+			clause = "1=1"
+		query = ("SELECT * FROM notifications " +\
+			"WHERE %s AND user_id=(SELECT id FROM users WHERE user=?) " +\
+			"ORDER BY timestamp DESC LIMIT ?") % clause
+		self.write(json.dumps(self.db.execute(query, (self.user, limit)).fetchall()))
+
+	def delete(self):
+		id = int(self.get_argument("id"))
+		self.write(json.dumps({"ok": self.db.execute("UPDATE notifications " +\
+			"SET active=0 WHERE user_id=(SELECT id FROM users WHERE user=?) " +\
+			"AND id=?", (user, id)).rowcount}))
+		
+

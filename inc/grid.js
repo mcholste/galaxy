@@ -240,6 +240,51 @@ function rotate_background(){
   $(document.body).append(img);
 }
 
+function show_queue_nav(){
+  $('#pulldown').empty();
+  if (TOGGLE === 'queue'){
+    TOGGLE = null;
+    $('#queue_nav_button').removeClass('golden');
+    return;
+  }
+  TOGGLE = 'queue';
+  $('#queue_nav_button').addClass('golden');
+  var keys = ['type', 'message', 'timestamp'];
+  $.get('notifications', null, function(data, status, xhr){
+    console.log('got notifications: ', data, typeof(data));
+    var table = document.createElement('table');
+    var thead = document.createElement('thead');
+    var tr = document.createElement('tr');
+    keys.forEach(function(k){
+      var td = document.createElement('td');
+      $(td).text(k);
+      tr.appendChild(td);
+    });
+    thead.appendChild(tr);
+    table.appendChild(thead);
+    var tbody = document.createElement('tbody');
+    for (var i = 0, len = data.length; i < len; i++){
+      var tr = document.createElement('tr');
+      keys.forEach(function(k){
+        var td = document.createElement('td');
+        if (k === 'timestamp'){
+          $(td).text(new Date(data[i][k] * 1000).toISOString());  
+        }
+        else {
+          $(td).text(data[i][k]);  
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    $('#pulldown').append(table);
+    //$('#pulldown').show(300);
+    $('#pulldown').slideDown();
+    
+  }, 'json');
+}
+
 $(document).on('ready', function(){
   $('#logo').click(rocketship);
   rotate_background();
@@ -250,6 +295,13 @@ $(document).on('ready', function(){
     show_main_nav();
   });
   $('#scope_nav_button').click(show_scope_nav);
+  $('#queue_nav_button').click(show_queue_nav);
+  $.get('notifications', null, function(data, status, xhr){
+    console.log('notifications', data);
+    $('#queue_nav_button').attr('data-count', data.length);
+    for (var i = 0, len = data.length; i < len; i++){
+    }
+  })
 
   $.get('tags', null, function(data, status, xhr){
     console.log('tags', data);
