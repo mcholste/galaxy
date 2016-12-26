@@ -346,7 +346,12 @@ class StaticHandler(BaseWebHandler):
 		extension = path.split(".")[-1]
 		self.mimetype = self.mimemap[extension]
 		self.set_header("Content-Type", self.mimetype)
-		self.write(open(self.content_dir + "/" + path).read())
+		try:
+			self.write(open(self.content_dir + "/" + path).read())
+		except IOError:
+			self.set_status(404)
+			self.set_header("Content-Type", "text/plain")
+			self.write("Not found")
 
 class BackgroundHandler(StaticHandler):
 	def __init__(self, *args, **kwargs):
