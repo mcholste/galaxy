@@ -253,22 +253,68 @@ function show_queue_nav(){
   $.get('notifications', null, function(data, status, xhr){
     console.log('got notifications: ', data, typeof(data));
     var table = document.createElement('table');
-    var thead = document.createElement('thead');
+    var tbody = document.createElement('tbody');
     var tr = document.createElement('tr');
     keys.forEach(function(k){
-      var td = document.createElement('td');
-      $(td).text(k);
+      var td = document.createElement('th');
+      var col_label = k[0].toUpperCase() + k.slice(1,k.length);
+      $(td).text(col_label);
       tr.appendChild(td);
     });
-    thead.appendChild(tr);
-    table.appendChild(thead);
-    var tbody = document.createElement('tbody');
+    tbody.appendChild(tr);
+    
     for (var i = 0, len = data.length; i < len; i++){
       var tr = document.createElement('tr');
+      $(tr).attr('data-value', data[i].id);
       keys.forEach(function(k){
         var td = document.createElement('td');
         if (k === 'timestamp'){
           $(td).text(new Date(data[i][k] * 1000).toISOString());  
+        }
+        else if (k === 'type'){
+          // Add set scope icon
+          var icon = document.createElement('i');
+          $(icon).addClass('fa fa-binoculars fa-fw');
+          $(icon).click(function(e){
+            var item = this; // use bound scope for item
+            console.log('item', item);
+            var scope = TRANSCRIPT.update('SCOPE', {
+              data: {
+                value: item.title,
+                search: item.query,
+                category: 'Alert'
+              }
+            }, function(err, data){
+              if (err) return;
+              //set_current_scope(scope);
+              ANALYSIS_TREE.propagate(item.title, 
+                TRANSCRIPT.transcript[TRANSCRIPT.transcript.length - 1]);
+            });
+          }.bind(data[i]));
+          td.appendChild(icon);
+          // Add close icon
+          icon = document.createElement('i');
+          $(icon).addClass('fa fa-close fa-fw');
+          $(icon).click(function(e){
+            var item = this; // use bound scope for item
+            console.log(item);
+            console.log('making alert id ' + item.id + ' inactive');
+            $.ajax('notifications?id=' + item.id, { 
+              method: 'DELETE', 
+              dataType: 'json',
+              success: function(e){
+                notify('Notification hidden');
+                $('#pulldown tr[data-value="' + item.id + '"]').remove();
+              }
+            }).fail(function(e){
+              console.error(e);
+              var errstr = 'Unable to set visibility';
+              console.error(errstr);
+              self.callbacks.error(errstr);
+            });
+
+          }.bind(data[i]));
+          td.appendChild(icon);
         }
         else {
           $(td).text(data[i][k]);  

@@ -299,7 +299,7 @@ Transcript.prototype.update = function(action, data, cb){
     console.log('put transcript', data);
     //var put_data = { action:action, scope:data.scope };
     data.action = action;
-    if (typeof(data.results_id) !== 'undefined') data.results_id = data.results_id;
+    //if (typeof(data.results_id) !== 'undefined') data.results_id = data.results_id;
     if (typeof(data.data) !== 'undefined') data.data = JSON.stringify(data.data);
     // Write to the server
     $.ajax('transcript', {
@@ -739,9 +739,9 @@ Transcript.prototype.render = function(){
     if (typeof(self.action_icons[item.action]) === 'undefined')
       throw Error('Invalid action ' + item.action);
     var icon = document.createElement('i');
-    $(icon).addClass('fa ' + self.action_icons[item.action].name + ' fa-fw');
+    $(icon).addClass('search_options fa ' + self.action_icons[item.action].name + ' fa-fw');
     $(icon).click($.contextMenu({
-      selector: 'td',
+      selector: 'i.search_options',
       trigger: 'left',
       callback: self.handle_search_context_menu_callback.bind(item),
       items: {

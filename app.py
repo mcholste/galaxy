@@ -94,11 +94,13 @@ class App:
 					self.log.debug("Got %d hits on alert %s" % (num_hits, alert["title"]))
 					result_id = self.db.execute("INSERT INTO results (user_id, results, timestamp) " +\
 						"VALUES (?,?,?)", (alert["user_id"], json.dumps(result), now)).lastrowid
-					self.db.execute("INSERT INTO alert_results (alert_id, hits, result_id) " +\
-						"VALUES(?,?,?)", (alert["id"], num_hits, result_id))
-					self.db.execute("INSERT INTO notifications (user_id, type, message, timestamp) " +\
-						"VALUES(?,?,?,?)", 
-						(alert["user_id"], "alert", alert["title"] + (" %d hits" % num_hits), now))
+					alert_result_id = self.db.execute("INSERT INTO alert_results " +\
+						"(alert_id, hits, result_id) " +\
+						"VALUES(?,?,?)", (alert["id"], num_hits, result_id)).lastrowid
+					self.db.execute("INSERT INTO notifications (user_id, type, message, " +\
+						"alert_result_id, timestamp) VALUES(?,?,?,?,?)", 
+						(alert["user_id"], "alert", 
+							alert["title"] + (" %d hits" % num_hits), alert_result_id, now))
 				else:
 					self.log.debug("Result did not have hits, not recording.")
 		except Exception as e:
@@ -261,6 +263,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 	message TEXT,
 	timestamp INTEGER NOT NULL,
 	active INTEGER NOT NULL DEFAULT 1,
+	alert_result_id INTEGER,
 	FOREIGN KEY (user_id) REFERENCES users (id)
 )""")
 		self.db.execute("""

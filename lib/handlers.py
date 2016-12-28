@@ -468,8 +468,10 @@ class TranscriptHandler(BaseWebHandler):
 			search = data.get("search", None)
 			category = data.get("category", None)
 			scope_id = self.db.execute("SELECT * FROM scopes WHERE user_id=? AND scope=?",
-				(user_id, value)).fetchone().get("id")
-			self.log.debug("found scope_id: %d" % scope_id)
+				(user_id, value)).fetchone()
+			if scope_id:
+				scope_id = scope_id.get("id")
+			self.log.debug("found scope_id: %s" % scope_id)
 			if not scope_id:
 				scope_id = self.db.execute("INSERT INTO scopes (user_id, scope, " +\
 				"category, search, created) " +\
@@ -700,7 +702,7 @@ class AlertManagementHandler(BaseWebHandler):
 			self.field = args[1]
 
 	def get(self, *args):
-		self._prepare(*args)
+		self._prepare(list(args))
 		self.write(json.dumps(
 			self.db.execute("SELECT * FROM alerts WHERE user_id=" +\
 			"(SELECT id FROM users WHERE user=?) and id=?",
@@ -708,7 +710,7 @@ class AlertManagementHandler(BaseWebHandler):
 		))
 
 	def delete(self, *args):
-		self._prepare(*args)
+		self._prepare(list(args))
 		self.write(json.dumps(
 			{
 				"ok": self.db.execute("DELETE FROM alerts " +\
@@ -752,11 +754,14 @@ class NotificationsHandler(BaseWebHandler):
 	def get(self):
 		limit = self.get_argument("limit", 50)
 		inactive = self.get_argument("all", None)
-		clause = "active=1"
+		clause = "t1.active=1"
 		if inactive:
 			clause = "1=1"
-		query = ("SELECT * FROM notifications " +\
-			"WHERE %s AND user_id=(SELECT id FROM users WHERE user=?) " +\
+		query = ("SELECT t1.id AS id, t1.type, t1.message, t1.timestamp AS timestamp, " +\
+			"t2.result_id, t3.title, t3.query FROM notifications t1 " +\
+			"JOIN alert_results t2 ON t1.alert_result_id=t2.id " +\
+			"JOIN alerts t3 ON t2.alert_id=t3.id " +\
+			"WHERE %s AND t1.user_id=(SELECT id FROM users WHERE user=?) " +\
 			"ORDER BY timestamp DESC LIMIT ?") % clause
 		self.write(json.dumps(self.db.execute(query, (self.user, limit)).fetchall()))
 
@@ -764,6 +769,6 @@ class NotificationsHandler(BaseWebHandler):
 		id = int(self.get_argument("id"))
 		self.write(json.dumps({"ok": self.db.execute("UPDATE notifications " +\
 			"SET active=0 WHERE user_id=(SELECT id FROM users WHERE user=?) " +\
-			"AND id=?", (user, id)).rowcount}))
+			"AND id=?", (self.user, id)).rowcount}))
 		
 
