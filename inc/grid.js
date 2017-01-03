@@ -271,18 +271,21 @@ function show_queue_nav(){
         if (k === 'timestamp'){
           $(td).text(new Date(data[i][k] * 1000).toISOString());  
         }
-        else if (k === 'type'){
-          // Add set scope icon
-          var icon = document.createElement('i');
-          $(icon).addClass('fa fa-binoculars fa-fw');
-          $(icon).click(function(e){
-            var item = this; // use bound scope for item
-            console.log('item', item);
+        else if (k === 'message'){
+          //$(td).text(data[i][k]);
+          var a = document.createElement('a');
+          $(a).text(data[i][k]);
+          td.appendChild(a);
+          $(a).click(function(e){
+            var item = this;
+            console.log('set SCOPE and PIVOT for item', item);
             var scope = TRANSCRIPT.update('SCOPE', {
               data: {
+                description: JSON.parse(item.query).raw_query,
                 value: item.title,
                 search: item.query,
-                category: 'Alert'
+                category: 'Alert',
+                results_id: item.results_id
               }
             }, function(err, data){
               if (err) return;
@@ -290,34 +293,74 @@ function show_queue_nav(){
               ANALYSIS_TREE.propagate(item.title, 
                 TRANSCRIPT.transcript[TRANSCRIPT.transcript.length - 1]);
             });
-          }.bind(data[i]));
-          td.appendChild(icon);
-          // Add close icon
-          icon = document.createElement('i');
-          $(icon).addClass('fa fa-close fa-fw');
-          $(icon).click(function(e){
-            var item = this; // use bound scope for item
-            console.log(item);
-            console.log('making alert id ' + item.id + ' inactive');
-            $.ajax('notifications?id=' + item.id, { 
-              method: 'DELETE', 
-              dataType: 'json',
-              success: function(e){
-                notify('Notification hidden');
-                $('#pulldown tr[data-value="' + item.id + '"]').remove();
-              }
-            }).fail(function(e){
+            
+            $.get('results/' + item.results_id, null, function(data, status, xhref){
+              render_search_result(data, status);
+              $('#pulldown').slideUp();
+            }, 'json')
+            .fail(function(e){
               console.error(e);
-              var errstr = 'Unable to set visibility';
+              var errstr = 'Unable to get result';  
               console.error(errstr);
-              self.callbacks.error(errstr);
+              show_error(errstr);
             });
+          }.bind(data[i]));  
+        }
+        else if (k === 'type'){
+          if (data[i][k] === 'alert'){
+            // Add set scope icon
+            var icon = document.createElement('i');
+            $(icon).addClass('fa fa-binoculars fa-fw');
+            $(icon).click(function(e){
+              var item = this; // use bound scope for item
+              console.log('item', item);
+              var scope = TRANSCRIPT.update('SCOPE', {
+                data: {
+                  description: JSON.parse(item.query).raw_query,
+                  value: item.title,
+                  search: item.query,
+                  category: 'Alert',
+                  results_id: item.results_id
+                }
+              }, function(err, data){
+                if (err) return;
+                //set_current_scope(scope);
+                ANALYSIS_TREE.propagate(item.title, 
+                  TRANSCRIPT.transcript[TRANSCRIPT.transcript.length - 1]);
+              });
+              $('#pulldown').slideUp();
+            }.bind(data[i]));
+            td.appendChild(icon);
+            // Add close icon
+            icon = document.createElement('i');
+            $(icon).addClass('fa fa-close fa-fw');
+            $(icon).click(function(e){
+              var item = this; // use bound scope for item
+              console.log(item);
+              console.log('making alert id ' + item.id + ' inactive');
+              $.ajax('notifications?id=' + item.id, { 
+                method: 'DELETE', 
+                dataType: 'json',
+                success: function(e){
+                  notify('Notification hidden');
+                  $('#pulldown tr[data-value="' + item.id + '"]').remove();
+                }
+              }).fail(function(e){
+                console.error(e);
+                var errstr = 'Unable to set visibility';
+                console.error(errstr);
+                self.callbacks.error(errstr);
+              });
 
-          }.bind(data[i]));
-          td.appendChild(icon);
+            }.bind(data[i]));
+            td.appendChild(icon);
+          }
+          else {
+            td.appendChild(document.createTextNode(data[i][k]));
+          }
         }
         else {
-          $(td).text(data[i][k]);  
+          console.log('error, unknown key ' + k);  
         }
         tr.appendChild(td);
       });
@@ -343,14 +386,15 @@ $(document).on('ready', function(){
   $('#scope_nav_button').click(show_scope_nav);
   $('#queue_nav_button').click(show_queue_nav);
   $.get('notifications', null, function(data, status, xhr){
-    console.log('notifications', data);
+    console.log('notifications', typeof(data), data);
+    console.log('notifications data-length ' + data.length);
     $('#queue_nav_button').attr('data-count', data.length);
     for (var i = 0, len = data.length; i < len; i++){
     }
-  })
+  }, 'json');
 
   $.get('tags', null, function(data, status, xhr){
-    console.log('tags', data);
+    console.log('tags', typeof(data), data);
     for (var i = 0, len = data.length; i < len; i++){
       if (typeof(TAGS[ data[i].tag ]) === 'undefined'){
         TAGS[ data[i].tag ] = {};
@@ -436,7 +480,12 @@ function render_search_result(data, status, xhr){
   $('#transcript_graph').remove();
   $('#histogram_container').empty();
   $('#viz_container').empty();
-  if (typeof(data.results.error) !== 'undefined'){
+  if (typeof(data.results) === 'undefined'){
+    console.log('null results in data: ', data);
+    show_error('Invalid results');
+    return;
+  }
+  else if (typeof(data.results.error) !== 'undefined'){
     console.log(data.results.error.root_cause[0].reason);
     show_error(data.results.error.root_cause[0].reason);
     return;

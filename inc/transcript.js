@@ -400,7 +400,10 @@ Transcript.prototype.load_item = function(e){
   if (e && e.hasOwnProperty('preventDefault')) e.preventDefault();
   self.selected = item.results_id;
   $.get('results/' + item.results_id, null, 
-    function(data, status, xhr){ render_search_result(data, status); self.render(); }, 'json')
+    function(data, status, xhr){ 
+      render_search_result(data, status); 
+      self.render(); 
+  }, 'json')
   .fail(function(e){
     console.error(e);
     var errstr = 'Unable to get result';  

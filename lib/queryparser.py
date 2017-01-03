@@ -47,16 +47,16 @@ class Parser:
 	def __init__(self):
 		self.log = logging.getLogger("galaxy.parser")
 
-	def parse(self, query_string, request):
+	def parse(self, query_string, params):
 		# Sanitize by removing any double spaces
 		query_string = re.sub(r'\s{2,}', ' ', query_string)
-		start_time = request.get_argument("start", None)
+		start_time = params.get("start", None)
 		if not start_time:
 			start_time = time() - self.DEFAULT_TIME_INTERVAL
 		else:
 			#start_time = mktime(datetime.datetime.strptime(start_time, "%m/%d/%Y").timetuple())
 			start_time = int(start_time)
-		end_time = request.get_argument("end", None)
+		end_time = params.get("end", None)
 		if not end_time:
 			end_time = time()
 		else:

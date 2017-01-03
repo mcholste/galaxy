@@ -135,7 +135,11 @@ class SearchHandler(BaseHandler):
 	# Using the post() coroutine
 	def get(self, uri):
 		query_string = self.get_argument("q")
-		es_query, parsed = self.parser.parse(query_string, self)
+		params = dict(
+			start=self.get_argument("start", None),
+			end=self.get_argument("end", None)
+		)
+		es_query, parsed = self.parser.parse(query_string, params)
 		self.log.debug("es_query: %r" % es_query)
 		self.request.parsed = parsed
 		self.request.es_query = es_query
@@ -237,22 +241,22 @@ class SearchHandler(BaseHandler):
 				("default",)).fetchone()["id"]
 				
 		# Log to results
-		self.db.execute("INSERT INTO results (user_id, results, timestamp) " +\
+		body["results_id"] = self.db.execute("INSERT INTO results (user_id, results, timestamp) " +\
 			"VALUES ((SELECT id FROM users WHERE user=?),?,?)", 
-			(DEFAULT_USER, base64.encodestring(zlib.compress(json.dumps(body))), time()))
-		id = self.db.execute("SELECT id FROM results " +\
-			"WHERE user_id=(SELECT id FROM users WHERE user=?) " +\
-			"ORDER BY id DESC LIMIT 1", (self.user,)).fetchone()
-		body["results_id"] = id["id"]
+			(DEFAULT_USER, base64.encodestring(zlib.compress(json.dumps(body))), time())).lastrowid
+		# id = self.db.execute("SELECT id FROM results " +\
+		# 	"WHERE user_id=(SELECT id FROM users WHERE user=?) " +\
+		# 	"ORDER BY id DESC LIMIT 1", (self.user,)).fetchone()
+		# body["results_id"] = id["id"]
 
-		self.db.execute("INSERT INTO transcript (user_id, action, data, description, " + \
+		body["transcript_id"] = self.db.execute("INSERT INTO transcript (user_id, action, data, description, " + \
 			"ref_id, scope_id, results_id, timestamp) " +\
 			"VALUES ((SELECT id FROM users WHERE user=?),?,?,?,?,?,?,?)",
 			(self.user, "SEARCH", json.dumps(data), body["description"], 
-				body["ref_id"], scope_id, id["id"], time()))
-		newid = self.db.execute("SELECT id FROM transcript " +\
-			"ORDER BY timestamp DESC LIMIT 1").fetchone()
-		body["transcript_id"] = newid["id"]
+				body["ref_id"], scope_id, id["id"], time())).lastrowid
+		# newid = self.db.execute("SELECT id FROM transcript " +\
+		# 	"ORDER BY timestamp DESC LIMIT 1").fetchone()
+		# body["transcript_id"] = newid["id"]
 
 		return body
 
@@ -465,6 +469,7 @@ class TranscriptHandler(BaseWebHandler):
 			self.log.debug("New favorite %d %s" % (user_id, value))
 		elif action == "SCOPE" and not scope_id:
 			value = data["value"]
+			description = data.get("description", None)
 			search = data.get("search", None)
 			category = data.get("category", None)
 			scope_id = self.db.execute("SELECT * FROM scopes WHERE user_id=? AND scope=?",
@@ -489,12 +494,12 @@ class TranscriptHandler(BaseWebHandler):
 			"description, ref_id, scope_id, timestamp) VALUES " + \
 			"((SELECT id FROM users WHERE user=?),?,?,?,?,?,?)",
 			(user, action, rawdata, description, ref_id, scope_id, time()))
-		newid = self.db.execute("SELECT * FROM transcript " +\
+		transcript_row = self.db.execute("SELECT * FROM transcript " +\
 			"ORDER BY id DESC LIMIT 1").fetchone()
 
 		self.set_status(200)
 		self.set_header("Content-Type", "application/javascript")
-		self.write(newid)
+		self.write(transcript_row)
 
 	def post(self):
 		user = DEFAULT_USER
@@ -566,23 +571,17 @@ class TagsHandler(BaseWebHandler):
 		super(TagsHandler, self).initialize(*args, **kwargs)
 
 	def get(self):
-		user = DEFAULT_USER
 		limit = self.get_argument("limit", 50)
-		self.set_status(200)
-		self.set_header("Content-Type", "application/javascript")
 		self.write(json.dumps(self.db.execute("SELECT * FROM tags " +\
 			"WHERE user_id=(SELECT id FROM users WHERE user=?) " +\
-			"ORDER BY timestamp DESC LIMIT ?", (user, limit)).fetchall()))
+			"ORDER BY timestamp DESC LIMIT ?", (self.user, limit)).fetchall()))
 
 	def delete(self):
-		user = DEFAULT_USER
 		tag = self.get_argument("tag")
 		value = self.get_argument("value")
-		self.set_status(200)
-		self.set_header("Content-Type", "application/javascript")
 		self.write(json.dumps({"ok": self.db.execute("DELETE FROM tags " +\
 			"WHERE user_id=(SELECT id FROM users WHERE user=?) " +\
-			"AND tag=? AND value=?", (user, tag, value)).rowcount}))
+			"AND tag=? AND value=?", (self.user, tag, value)).rowcount}))
 
 class FavoritesHandler(BaseWebHandler):
 	def __init__(self, application, request, **kwargs):
@@ -590,27 +589,20 @@ class FavoritesHandler(BaseWebHandler):
 		self.log = logging.getLogger("galaxy.favorites_handler")
 		self.db = kwargs["db"]
 
-
 	def initialize(self, *args, **kwargs):
 		super(FavoritesHandler, self).initialize(*args, **kwargs)
 
 	def get(self):
-		user = DEFAULT_USER
 		limit = self.get_argument("limit", 50)
-		self.set_status(200)
-		self.set_header("Content-Type", "application/javascript")
 		self.write(json.dumps(self.db.execute("SELECT * FROM favorites " +\
 			"WHERE user_id=(SELECT id FROM users WHERE user=?) " +\
-			"ORDER BY timestamp DESC LIMIT ?", (user, limit)).fetchall()))
+			"ORDER BY timestamp DESC LIMIT ?", (self.user, limit)).fetchall()))
 
 	def delete(self):
-		user = DEFAULT_USER
 		value = self.get_argument("value")
-		self.set_status(200)
-		self.set_header("Content-Type", "application/javascript")
 		self.write(json.dumps({"ok": self.db.execute("DELETE FROM favorites " +\
 			"WHERE user_id=(SELECT id FROM users WHERE user=?) " +\
-			"AND value=?", (user, value)).rowcount}))
+			"AND value=?", (self.user, value)).rowcount}))
 
 class ScopesHandler(BaseWebHandler):
 	def __init__(self, application, request, **kwargs):
@@ -622,13 +614,10 @@ class ScopesHandler(BaseWebHandler):
 		super(ScopesHandler, self).initialize(*args, **kwargs)
 
 	def get(self):
-		user = DEFAULT_USER
 		limit = self.get_argument("limit", 50)
-		self.set_status(200)
-		self.set_header("Content-Type", "application/javascript")
 		rows = self.db.execute("SELECT * FROM scopes " +\
 			"WHERE user_id=(SELECT id FROM users WHERE user=?) " +\
-			"ORDER BY created DESC LIMIT ?", (user, limit)).fetchall()
+			"ORDER BY created DESC LIMIT ?", (self.user, limit)).fetchall()
 		ret = {}
 		for row in rows:
 			if not ret.has_key(row["category"]):
@@ -638,13 +627,10 @@ class ScopesHandler(BaseWebHandler):
 		self.write(json.dumps(ret))
 
 	def delete(self):
-		user = DEFAULT_USER
 		value = self.get_argument("value")
-		self.set_status(200)
-		self.set_header("Content-Type", "application/javascript")
 		self.write(json.dumps({"ok": self.db.execute("DELETE FROM favorites " +\
 			"WHERE user_id=(SELECT id FROM users WHERE user=?) " +\
-			"AND value=?", (user, value)).rowcount}))
+			"AND value=?", (self.user, value)).rowcount}))
 
 class AlertGetterHandler(BaseWebHandler):
 	def __init__(self, application, request, **kwargs):
@@ -654,10 +640,7 @@ class AlertGetterHandler(BaseWebHandler):
 
 	def initialize(self, *args, **kwargs):
 		super(AlertGetterHandler, self).initialize(*args, **kwargs)
-		self.user = DEFAULT_USER
-		self.set_status(200)
-		self.set_header("Content-Type", "application/javascript")
-
+		
 	def get(self):
 		limit = self.get_argument("limit", 50)
 		offset = self.get_argument("offset", 0)
@@ -689,11 +672,7 @@ class AlertManagementHandler(BaseWebHandler):
 
 	def initialize(self, *args, **kwargs):
 		super(AlertManagementHandler, self).initialize(*args, **kwargs)
-		self.log.debug("args: %r, kwargs: %r" % (args, kwargs))
-		self.user = DEFAULT_USER
-		self.set_status(200)
-		self.set_header("Content-Type", "application/javascript")
-
+		
 	def _prepare(self, args):
 		self.log.debug("type args: %s" % type(args))
 		self.log.debug("args: %r" % args)
@@ -751,6 +730,9 @@ class NotificationsHandler(BaseWebHandler):
 		self.log = logging.getLogger("galaxy.notifications_handler")
 		self.db = kwargs["db"]
 
+	def initialize(self, *args, **kwargs):
+		super(NotificationsHandler, self).initialize(*args, **kwargs)
+
 	def get(self):
 		limit = self.get_argument("limit", 50)
 		inactive = self.get_argument("all", None)
@@ -758,8 +740,8 @@ class NotificationsHandler(BaseWebHandler):
 		if inactive:
 			clause = "1=1"
 		query = ("SELECT t1.id AS id, t1.type, t1.message, t1.timestamp AS timestamp, " +\
-			"t2.result_id, t3.title, t3.query FROM notifications t1 " +\
-			"JOIN alert_results t2 ON t1.alert_result_id=t2.id " +\
+			"t2.results_id, t3.title, t3.query FROM notifications t1 " +\
+			"JOIN alert_results t2 ON t1.alert_results_id=t2.id " +\
 			"JOIN alerts t3 ON t2.alert_id=t3.id " +\
 			"WHERE %s AND t1.user_id=(SELECT id FROM users WHERE user=?) " +\
 			"ORDER BY timestamp DESC LIMIT ?") % clause
