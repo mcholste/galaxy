@@ -84,6 +84,9 @@ class App:
 				if type(result) is tornado.web.HTTPError:
 					self.log.error(result["error"])
 					continue
+				if not result.body:
+					self.log.error("No response back for query.")
+					continue
 				result = json.loads(result.body)
 				now = time()
 				self.log.debug("Ran alert query in %f seconds" % (now - start))
@@ -92,15 +95,15 @@ class App:
 					result["hits"]["hits"]:
 					num_hits = len(result["hits"]["hits"])
 					self.log.debug("Got %d hits on alert %s" % (num_hits, alert["title"]))
-					result_id = self.db.execute("INSERT INTO results (user_id, results, timestamp) " +\
+					results_id = self.db.execute("INSERT INTO results (user_id, results, timestamp) " +\
 						"VALUES (?,?,?)", (alert["user_id"], json.dumps(result), now)).lastrowid
-					alert_result_id = self.db.execute("INSERT INTO alert_results " +\
-						"(alert_id, hits, result_id) " +\
-						"VALUES(?,?,?)", (alert["id"], num_hits, result_id)).lastrowid
+					alert_results_id = self.db.execute("INSERT INTO alert_results " +\
+						"(alert_id, hits, results_id) " +\
+						"VALUES(?,?,?)", (alert["id"], num_hits, results_id)).lastrowid
 					self.db.execute("INSERT INTO notifications (user_id, type, message, " +\
-						"alert_result_id, timestamp) VALUES(?,?,?,?,?)", 
+						"alert_results_id, timestamp) VALUES(?,?,?,?,?)", 
 						(alert["user_id"], "alert", 
-							alert["title"] + (" %d hits" % num_hits), alert_result_id, now))
+							alert["title"] + (" %d hits" % num_hits), alert_results_id, now))
 				else:
 					self.log.debug("Result did not have hits, not recording.")
 		except Exception as e:
@@ -250,10 +253,10 @@ CREATE TABLE IF NOT EXISTS alerts (
 CREATE TABLE IF NOT EXISTS alert_results (
 	id INTEGER PRIMARY KEY,
 	alert_id INTEGER,
-	result_id INTEGER,
+	results_id INTEGER,
 	hits INTEGER NOT NULL,
 	FOREIGN KEY (alert_id) REFERENCES alerts (id),
-	FOREIGN KEY (result_id) REFERENCES results (id)
+	FOREIGN KEY (results_id) REFERENCES results (id)
 )""")
 		self.db.execute("""
 CREATE TABLE IF NOT EXISTS notifications (
@@ -263,7 +266,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 	message TEXT,
 	timestamp INTEGER NOT NULL,
 	active INTEGER NOT NULL DEFAULT 1,
-	alert_result_id INTEGER,
+	alert_results_id INTEGER,
 	FOREIGN KEY (user_id) REFERENCES users (id)
 )""")
 		self.db.execute("""
